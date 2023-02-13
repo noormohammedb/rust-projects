@@ -4,13 +4,11 @@ use std::{fs, io, path::Path};
 use zip::ZipArchive;
 
 fn main() {
-    println!("");
     std::process::exit(real_main());
 }
 
 fn real_main() -> i32 {
     let args: Vec<_> = args().collect();
-    dbg!(&args);
     if args.len() < 2 {
         println!("Usage: {} <FileName>", args[0]);
         return 1;
@@ -18,17 +16,10 @@ fn real_main() -> i32 {
     let fname = Path::new(&args[1]);
     let file = fs::File::open(fname).unwrap();
 
-    // dbg!(&fname);
-    // dbg!(&file);
-
     let mut archive = ZipArchive::new(file).unwrap();
-
-    // dbg!(&archive);
-    // println!("{:?}", archive.len());
 
     for i in 0..archive.len() {
         let mut file = archive.by_index(i).unwrap();
-        // dbg!(file);
 
         let outpath = match file.enclosed_name() {
             Some(path) => path.to_owned(),
@@ -41,10 +32,12 @@ fn real_main() -> i32 {
             }
         }
 
-        dbg!(file.name());
-
         if file.name().ends_with('/') {
-            println!("File: {}, Extracted to \"{}\" ", i, outpath.display());
+            println!(
+                "File: {}, Extracted to \"{}\" Directory",
+                i,
+                outpath.display()
+            );
             fs::create_dir_all(outpath).unwrap();
         } else {
             println!(
@@ -60,6 +53,19 @@ fn real_main() -> i32 {
             }
             let mut outfile = fs::File::create(outpath).unwrap();
             io::copy(&mut file, &mut outfile).unwrap();
+        }
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+
+            if let Some(mode) = file.unix_mode() {
+                fs::set_permissions(
+                    file.enclosed_name().unwrap(),
+                    fs::Permissions::from_mode(mode),
+                )
+                .unwrap();
+            }
         }
     }
 
